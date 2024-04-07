@@ -10,7 +10,7 @@ void writePrivateKeyToFile(const Botan::RSA_PrivateKey& privateKey, const std::s
 void encryptFileRSA(const std::string& inputFilename, const std::string& outputDir, const std::string& outputFilename, size_t keySize);
 void decryptFileRSA(const std::string& inputFilename, const std::string& outputFilename, const Botan::RSA_PrivateKey& privateKey, size_t keySize);
 void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputDir, size_t keySize);
-void decryptDirectoryRSA(const std::string& inputDir, const std::string& outputDir, size_t keySize);
+void decryptDirectoryRSA(const std::string& outputDir, size_t keySize);
 
 
 #endif // RSA_UTILS_H

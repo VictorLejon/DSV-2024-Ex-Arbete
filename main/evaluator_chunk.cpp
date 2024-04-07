@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
     try {
         if (algorithm == "RSA") {
             encryptDirectoryRSA(inputDir, outputDir, keySize);
-            //decryptDirectoryRSA(inputDir, outputDir, keySize);
+            decryptDirectoryRSA(outputDir, keySize);
         } else {
             std::cerr << "Unsupported algorithm. Currently supported: RSA\n";
             return 1;

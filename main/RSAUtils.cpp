@@ -1,6 +1,7 @@
 // RSAUtils.cpp
 #include "RSAUtils.h"
 #include <botan/pkcs8.h>
+#include <botan/data_src.h>
 #include <botan/auto_rng.h>
 #include <botan/pubkey.h>
 #include <botan/x509_key.h>
@@ -21,14 +22,18 @@ Botan::RSA_PrivateKey loadPrivateKeyFromFile(const std::string& filename, Botan:
     std::ostringstream oss;
     oss << keyFile.rdbuf();
     std::string keyData = oss.str();
-
-    std::unique_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyData, rng));
+    
+    // Create a DataSource from the string
+    Botan::DataSource_Memory keyDataSource(keyData);
+    
+    std::unique_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyDataSource, rng));
     Botan::RSA_PrivateKey* rsaKey = dynamic_cast<Botan::RSA_PrivateKey*>(key.get());
+
     if (!rsaKey) {
         throw std::runtime_error("The loaded key is not an RSA private key.");
     }
 
-    // Copy the key to avoid issues when the unique_ptr goes out of scope
+    // Return a copy of the RSA key to avoid issues when the unique_ptr goes out of scope
     return *rsaKey;
 }
 
@@ -124,6 +129,8 @@ void decryptChunkRSA(const Botan::PK_Decryptor_EME& decryptor, std::vector<uint8
 
 void decryptFileRSA(const std::string& inputFilename, const std::string& outputFilename, const Botan::RSA_PrivateKey& privateKey, size_t keySize) {
 
+    size_t encryptedChunkSize = keySize == 1024 ? 128 : 256;
+    
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -133,7 +140,7 @@ void decryptFileRSA(const std::string& inputFilename, const std::string& outputF
     std::ifstream inFile(inputFilename, std::ios::binary);
     std::ofstream outFile(outputFilename, std::ios::binary);
 
-    size_t encryptedChunkSize = keySize == 1024 ? 128 : 256;
+    
 
     std::vector<uint8_t> buffer(encryptedChunkSize);
     while (inFile.read(reinterpret_cast<char*>(buffer.data()), encryptedChunkSize)) {
@@ -155,16 +162,16 @@ void decryptFileRSA(const std::string& inputFilename, const std::string& outputF
     std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
 }
 
-void decryptDirectoryRSA(const std::string& inputDir, const std::string& outputDir, size_t keySize) {
+void decryptDirectoryRSA(const std::string& outputDir, size_t keySize) {
     fs::create_directories(outputDir + "/decrypted");
 
-    for (const auto& entry : fs::directory_iterator(inputDir)) {
+    for (const auto& entry : fs::directory_iterator(outputDir)) {
         if (entry.is_regular_file()) {
             Botan::AutoSeeded_RNG rng;
             std::string inputPath = entry.path();
-            std::string outputPath = outputDir + "/decrypted_" + entry.path().filename().string();
-            //auto privateKey = loadPrivateKeyFromFile(privateKeyFilename, rng);
-            //decryptFileRSA(inputPath, outputPath, privateKey, keySize);
+            std::string outputPath = outputDir + "/decrypted" + "/decrypted_" + entry.path().filename().string();
+            auto privateKey = loadPrivateKeyFromFile(outputDir + "/keys/" + entry.path().filename().string() + ".pem", rng);
+            decryptFileRSA(inputPath, outputPath, privateKey, keySize);
         }
     }
 }
