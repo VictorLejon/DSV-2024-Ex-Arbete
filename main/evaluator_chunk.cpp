@@ -39,16 +39,22 @@ void encryptFileRSA(const std::string& inputFilename, const std::string& outputF
         buffer.resize(maxChunkSize); // Reset buffer size for the next chunk
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+
     inFile.close();
     outFile.close();
 
-    auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> encryptionTime = end - start;
+    
+    // Calculate file sizes
+    auto inputFileSize = fs::file_size(inputFilename);
+    auto outputFileSize = fs::file_size(outputFilename);
+    
     std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds with " << chunkCount << " chunks." << std::endl;
+    std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes.\n" << std::endl;
 }
 
 void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputDir, size_t keySize) {
-    auto dirStart = std::chrono::high_resolution_clock::now();
     
     fs::create_directories(outputDir);
 
@@ -60,10 +66,10 @@ void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputD
         }
     }
 
-    auto dirEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> totalDirTime = dirEnd - dirStart;
-    std::cout << "Total encryption time for directory: " << totalDirTime.count() << " milliseconds." << std::endl;
+    std::cout << "Encryption process done" << std::endl;
 }
+
+
 
 int main(int argc, char* argv[]) {
     if (argc < 5) {
