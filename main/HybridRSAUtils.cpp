@@ -54,6 +54,14 @@ void hybridEncryptFile(const std::string& inputFilename, const std::string& encr
 
     auto end = std::chrono::high_resolution_clock::now();
 
+    auto inputFileSize = fs::file_size(inputFilename);
+    auto outputFileSize = fs::file_size(encryptedDataOutputFilename);
+
+    std::chrono::duration<double, std::milli> encryptionTime = end - start;
+
+    std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds." << std::endl;
+    std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
+
     // Save the encrypted AES key and IV
     std::ofstream encryptedKeyFile(encryptedKeyOutputFilename, std::ios::out | std::ios::binary);
     if (!encryptedKeyFile) {
@@ -63,6 +71,8 @@ void hybridEncryptFile(const std::string& inputFilename, const std::string& encr
     encryptedKeyFile.write(reinterpret_cast<const char*>(encryptedKey.data()), encryptedKey.size());
     encryptedKeyFile.close();
 
+    std::cout << "AES key written to " << encryptedKeyOutputFilename << std::endl;
+
     // Write the private key to a file in PKCS#8 PEM format
     std::ofstream privateKeyFile(privateKeyOutputFilename, std::ios::out | std::ios::binary);
     if (!privateKeyFile) {
@@ -70,10 +80,14 @@ void hybridEncryptFile(const std::string& inputFilename, const std::string& encr
     }
     privateKeyFile << Botan::PKCS8::PEM_encode(rsaPrivateKey);
     privateKeyFile.close();
+
+    std::cout << "Private RSA key written to " << privateKeyOutputFilename << std::endl;
 }
 
-/*
+
 void hybridDecryptFile(const std::string& encryptedDataInputFilename, const std::string& encryptedKeyInputFilename, const std::string& decryptedOutputFilename, const std::string& privateKeyFilename) {
+   
+    auto start = std::chrono::high_resolution_clock::now();
     Botan::AutoSeeded_RNG rng;
 
     // Load the RSA private key
@@ -87,7 +101,8 @@ void hybridDecryptFile(const std::string& encryptedDataInputFilename, const std:
     encryptedKeyFile.close();
 
     // Decrypt the AES key and IV
-    std::vector<uint8_t> decryptedKeyIV = decryptor.decrypt(encryptedKey.data(), encryptedKey.size());
+    Botan::secure_vector<uint8_t> decryptedKeyIV_secure = decryptor.decrypt(encryptedKey.data(), encryptedKey.size());
+    std::vector<uint8_t> decryptedKeyIV(decryptedKeyIV_secure.begin(), decryptedKeyIV_secure.end());
 
     // Extract the AES key and IV
     Botan::SymmetricKey aesKey(&decryptedKeyIV[0], 32);
@@ -105,28 +120,20 @@ void hybridDecryptFile(const std::string& encryptedDataInputFilename, const std:
     std::ofstream decryptedDataFile(decryptedOutputFilename, std::ios::out | std::ios::binary);
     pipe.set_default_msg(0);
     decryptedDataFile << pipe;
+
+    auto end = std::chrono::high_resolution_clock::now();
+
     decryptedDataFile.close();
+
+    auto inputFileSize = fs::file_size(encryptedDataInputFilename);
+    auto outputFileSize = fs::file_size(decryptedOutputFilename);
+
+    std::chrono::duration<double, std::milli> decryptionTime = end - start;
+
+    std::cout << "File: " << encryptedDataInputFilename << " decrypted in " << decryptionTime.count() << " milliseconds." << std::endl;
+    std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
 }
 
-*/
-
-/*
-
-void generateRSAKeyPair(const std::string& publicKeyFilename, const std::string& privateKeyFilename, size_t keySize) {
-    Botan::AutoSeeded_RNG rng;
-    Botan::RSA_PrivateKey rsaKey(rng, keySize);
-
-    // Save the private key
-    std::ofstream outFile(privateKeyFilename, std::ios::out | std::ios::binary);
-    outFile << Botan::PKCS8::PEM_encode(rsaKey);
-    outFile.close();
-
-    // Save the public key
-    std::ofstream outPubFile(publicKeyFilename, std::ios::out | std::ios::binary);
-    outPubFile << Botan::X509::PEM_encode(rsaKey);
-    outPubFile.close();
-}
-*/
 
 void encryptDirectoryHybridRSA(const std::string& inputDir, const std::string& outputDir) {
     fs::create_directories(outputDir);
@@ -135,29 +142,25 @@ void encryptDirectoryHybridRSA(const std::string& inputDir, const std::string& o
     for (const auto& entry : fs::directory_iterator(inputDir)) {
         if (entry.is_regular_file()) {
             std::string inputPath = entry.path();
-            std::string outputDataFilename = outputDir + "/encrypted_" + entry.path().filename().string() + ".bin";
-            std::string outputAESKeyFilename = outputDir + "/keys/aes_" + entry.path().filename().string() + ".bin";
-            std::string outputRSAKeyFilename = outputDir + "/keys/rsa_" + entry.path().filename().string() + ".pem";
+            std::string outputDataFilename = outputDir + "/encrypted_" + entry.path().filename().string();
+            std::string outputAESKeyFilename = outputDir + "/keys/aes_encrypted_" + entry.path().filename().string() + ".key";
+            std::string outputRSAKeyFilename = outputDir + "/keys/rsa_encrypted_" + entry.path().filename().string() + ".pem";
             hybridEncryptFile(inputPath, outputDataFilename, outputAESKeyFilename, outputRSAKeyFilename);
         }
     }
 }
 
-/*
-void hybridDecryptDirectory(const std::string& inputDir, const std::string& outputDir) {
-    fs::create_directories(outputDir);
 
-    Botan::AutoSeeded_RNG rng;
-    Botan::DataSource_Stream in(privateKeyFilename);
-    std::unique_ptr<Botan::Private_Key> privKey(Botan::PKCS8::load_key(in, rng));
+void decryptDirectoryHybridRSA(const std::string& inputDir) {
+    fs::create_directories(inputDir + "/decrypted");
 
     for (const auto& entry : fs::directory_iterator(inputDir)) {
-        if (entry.is_regular_file() && entry.path().extension() != ".key") {
+        if (entry.is_regular_file()) {
             std::string inputPath = entry.path();
-            std::string inputKeyPath = inputPath + ".key";
-            std::string outputFilename = outputDir + "/decrypted_" + entry.path().filename().string();
-            hybridDecryptFile(inputPath, inputKeyPath, outputFilename, *privKey, rng);
+            std::string inputKeyPath = inputDir + "/keys/aes_" + entry.path().filename().string() + ".key";
+            std::string outputFilename = inputDir + "/decrypted/" + "decrypted_" + entry.path().filename().string();
+            std::string privKeyPath = inputDir + "/keys/rsa_" + entry.path().filename().string() + ".pem";
+            hybridDecryptFile(inputPath, inputKeyPath, outputFilename, privKeyPath);
         }
     }
 }
-*/

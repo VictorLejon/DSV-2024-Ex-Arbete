@@ -10,7 +10,7 @@ namespace fs = std::filesystem;
 
 int main(int argc, char* argv[]) {
     if (argc < 5) {
-        std::cerr << "Usage: " << argv[0] << " --alg [RSA, RSA-AES, Kyber-AES] --keysize <1024||2048> <input directory> <output directory>\n";
+        std::cerr << "Usage: " << argv[0] << " --alg [RSA, RSA-AES, Kyber-AES] --keysize <1024|2048> <input directory> <output directory>\n";
         return 1;
     }
 
@@ -26,9 +26,10 @@ int main(int argc, char* argv[]) {
         }
         else if (algorithm == "RSA-AES") {
             encryptDirectoryHybridRSA(inputDir, outputDir);
+            decryptDirectoryHybridRSA(outputDir);
         }
         else {
-            std::cerr << "Unsupported algorithm. Currently supported: RSA\n";
+            std::cerr << "Unsupported algorithm. Currently supported: RSA, RSA-AES, Kyber-AES\n";
             return 1;
         }
     } catch (const Botan::Exception& e) {
