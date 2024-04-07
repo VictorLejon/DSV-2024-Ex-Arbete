@@ -7,46 +7,49 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <chrono>
 
 namespace fs = std::filesystem;
 
-void encryptChunkRSA(const Botan::PK_Encryptor_EME& encryptor, std::vector<uint8_t>& buffer, std::ofstream& outFile) {
+void encryptChunkRSA(const Botan::PK_Encryptor_EME& encryptor, std::vector<uint8_t>& buffer, std::ofstream& outFile, unsigned long long& chunkCount) {
     Botan::AutoSeeded_RNG rng;
     std::vector<uint8_t> ciphertext = encryptor.encrypt(buffer.data(), buffer.size(), rng);
     outFile.write(reinterpret_cast<const char*>(ciphertext.data()), ciphertext.size());
+    chunkCount++; // Increment the chunk counter
 }
 
 void encryptFileRSA(const std::string& inputFilename, const std::string& outputFilename, size_t keySize) {
+    auto start = std::chrono::high_resolution_clock::now();
+    unsigned long long chunkCount = 0; // Initialize chunk counter
+    
     Botan::AutoSeeded_RNG rng;
     Botan::RSA_PrivateKey privateKey(rng, keySize);
     Botan::PK_Encryptor_EME encryptor(privateKey, rng, "EME1(SHA-256)");
 
     std::ifstream inFile(inputFilename, std::ios::binary);
-    std::ofstream outFile("encrypted_" + outputFilename, std::ios::binary);
+    std::ofstream outFile(outputFilename, std::ios::binary);
 
-    // Adjust maxChunkSize based on the RSA key size and padding scheme
-    size_t maxChunkSize;
-    if (keySize == 2048)
-    {
-        maxChunkSize = 190; // For 2048-bit RSA key with OAEP SHA-256 padding
-
-    }else if (keySize == 1024){
-        maxChunkSize = 62;
-    }
+    size_t maxChunkSize = keySize == 1024 ? 117 : 190; // Adjust based on key size and padding scheme
 
     std::vector<uint8_t> buffer(maxChunkSize);
     while (inFile.read(reinterpret_cast<char*>(buffer.data()), maxChunkSize) || inFile.gcount() > 0) {
         size_t bytesRead = inFile.gcount();
         buffer.resize(bytesRead); // Adjust buffer size for the last read chunk
-        encryptChunkRSA(encryptor, buffer, outFile);
+        encryptChunkRSA(encryptor, buffer, outFile, chunkCount);
         buffer.resize(maxChunkSize); // Reset buffer size for the next chunk
     }
 
     inFile.close();
     outFile.close();
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> encryptionTime = end - start;
+    std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds with " << chunkCount << " chunks." << std::endl;
 }
 
 void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputDir, size_t keySize) {
+    auto dirStart = std::chrono::high_resolution_clock::now();
+    
     fs::create_directories(outputDir);
 
     for (const auto& entry : fs::directory_iterator(inputDir)) {
@@ -56,6 +59,10 @@ void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputD
             encryptFileRSA(inputPath, outputPath, keySize);
         }
     }
+
+    auto dirEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> totalDirTime = dirEnd - dirStart;
+    std::cout << "Total encryption time for directory: " << totalDirTime.count() << " milliseconds." << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -76,8 +83,6 @@ int main(int argc, char* argv[]) {
             std::cerr << "Unsupported algorithm. Currently supported: RSA\n";
             return 1;
         }
-
-        std::cout << "Encryption successful. Encrypted files are in: " << outputDir << std::endl;
     } catch (const Botan::Exception& e) {
         std::cerr << "Encryption failed: " << e.what() << '\n';
         return 1;
