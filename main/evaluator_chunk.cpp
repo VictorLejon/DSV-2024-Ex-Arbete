@@ -1,4 +1,5 @@
 #include "RSAUtils.h"
+#include "HybridRSAUtils.h"
 #include <iostream>
 #include <string>
 #include <botan/rsa.h>
@@ -9,7 +10,7 @@ namespace fs = std::filesystem;
 
 int main(int argc, char* argv[]) {
     if (argc < 5) {
-        std::cerr << "Usage: " << argv[0] << " --alg [RSA] --keysize <key size> <input directory> <output directory>\n";
+        std::cerr << "Usage: " << argv[0] << " --alg [RSA, RSA-AES, Kyber-AES] --keysize <1024||2048> <input directory> <output directory>\n";
         return 1;
     }
 
@@ -22,7 +23,11 @@ int main(int argc, char* argv[]) {
         if (algorithm == "RSA") {
             encryptDirectoryRSA(inputDir, outputDir, keySize);
             decryptDirectoryRSA(outputDir, keySize);
-        } else {
+        }
+        else if (algorithm == "RSA-AES") {
+            encryptDirectoryHybridRSA(inputDir, outputDir);
+        }
+        else {
             std::cerr << "Unsupported algorithm. Currently supported: RSA\n";
             return 1;
         }
