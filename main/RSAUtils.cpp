@@ -37,21 +37,17 @@ Botan::RSA_PrivateKey loadPrivateKeyFromFile(const std::string& filename, Botan:
     return *rsaKey;
 }
 
-void writePrivateKeyToFile(const Botan::RSA_PrivateKey& privateKey, const std::string& filename) {
-    Botan::AutoSeeded_RNG rng;
+void writePrivateKeyToFile(const Botan::RSA_PrivateKey& rsaPrivateKey, const std::string& privateKeyOutputFilename) {
 
-    // Serialize the private key to PKCS#8 format
-    Botan::secure_vector<uint8_t> keyData = Botan::PKCS8::BER_encode(privateKey);
-
-    // Write to a file
-    std::ofstream outFile(filename, std::ios::binary);
-    if (!outFile) {
-        throw std::runtime_error("Could not open file for writing the private key: " + filename);
+    // Write the private key to a file in PKCS#8 PEM format
+    std::ofstream privateKeyFile(privateKeyOutputFilename, std::ios::out | std::ios::binary);
+    if (!privateKeyFile) {
+        throw std::runtime_error("Could not open private key file for writing: " + privateKeyOutputFilename);
     }
-    outFile.write(reinterpret_cast<const char*>(keyData.data()), keyData.size());
-    outFile.close();
+    privateKeyFile << Botan::PKCS8::PEM_encode(rsaPrivateKey);
+    privateKeyFile.close();
 
-    std::cout << "Private key written to " << filename << std::endl;
+    std::cout << "Private key written to " << privateKeyOutputFilename << std::endl;
 }
 
 void encryptChunkRSA(const Botan::PK_Encryptor_EME& encryptor, std::vector<uint8_t>& buffer, std::ofstream& outFile, unsigned long long& chunkCount) {
@@ -63,7 +59,7 @@ void encryptChunkRSA(const Botan::PK_Encryptor_EME& encryptor, std::vector<uint8
 
 void encryptFileRSA(const std::string& inputFilename, const std::string& outputDir, const std::string& outputFilename,  size_t keySize) {
 
-    size_t maxChunkSize = keySize == 1024 ? 117 : 190; // Adjust based on key size and padding scheme
+    size_t maxChunkSize = keySize == 1024 ? 62 : 190; // Adjust based on key size and padding scheme
     unsigned long long chunkCount = 0; // Initialize chunk counte
     std::string outputPath = outputDir + "/" + outputFilename;
 
@@ -100,7 +96,6 @@ void encryptFileRSA(const std::string& inputFilename, const std::string& outputD
     std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds with " << chunkCount << " chunks." << std::endl;
     std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
     writePrivateKeyToFile(privateKey, outputDir + "/keys/" + outputFilename + ".pem"); // Done for decryption purposes, not secure
-    std::cout << std::endl;
 }
 
 void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputDir, size_t keySize) {
@@ -116,7 +111,7 @@ void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputD
         }
     }
 
-    std::cout << "Encryption process done" << std::endl;
+    std::cout << "Encryption process done.\n" << std::endl;
 }
 
 
@@ -167,9 +162,9 @@ void decryptDirectoryRSA(const std::string& outputDir, size_t keySize) {
 
     for (const auto& entry : fs::directory_iterator(outputDir)) {
         if (entry.is_regular_file()) {
-            Botan::AutoSeeded_RNG rng;
             std::string inputPath = entry.path();
             std::string outputPath = outputDir + "/decrypted" + "/decrypted_" + entry.path().filename().string();
+            Botan::AutoSeeded_RNG rng;
             auto privateKey = loadPrivateKeyFromFile(outputDir + "/keys/" + entry.path().filename().string() + ".pem", rng);
             decryptFileRSA(inputPath, outputPath, privateKey, keySize);
         }
