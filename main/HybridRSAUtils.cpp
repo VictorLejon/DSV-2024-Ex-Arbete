@@ -132,6 +132,7 @@ void encryptDirectoryHybridRSA(const std::string& inputDir, const std::string& o
             hybridEncryptFile(inputPath, outputDataFilename, outputAESKeyFilename, outputRSAKeyFilename);
         }
     }
+    std::cout << "Encryption process done. \n" << std::endl;
 }
 
 
@@ -147,4 +148,5 @@ void decryptDirectoryHybridRSA(const std::string& inputDir) {
             hybridDecryptFile(inputPath, inputKeyPath, outputFilename, privKeyPath);
         }
     }
+    std::cout << "Decryption process done. \n" << std::endl;
 }

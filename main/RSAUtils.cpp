@@ -26,7 +26,7 @@ Botan::RSA_PrivateKey loadPrivateKeyFromFile(const std::string& filename, Botan:
     // Create a DataSource from the string
     Botan::DataSource_Memory keyDataSource(keyData);
     
-    std::unique_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyDataSource, rng));
+    std::unique_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyDataSource));
     Botan::RSA_PrivateKey* rsaKey = dynamic_cast<Botan::RSA_PrivateKey*>(key.get());
 
     if (!rsaKey) {
@@ -169,4 +169,5 @@ void decryptDirectoryRSA(const std::string& outputDir, size_t keySize) {
             decryptFileRSA(inputPath, outputPath, privateKey, keySize);
         }
     }
+    std::cout << "Decryption process done. \n" << std::endl;
 }

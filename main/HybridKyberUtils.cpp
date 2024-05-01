@@ -18,25 +18,10 @@
 namespace fs = std::filesystem;
 
 
-#include "HybridKyberUtils.h"
-#include <botan/auto_rng.h>
-#include <botan/kyber.h>
-#include <botan/block_cipher.h>
-#include <botan/asn1_obj.h>
-#include <botan/der_enc.h>
-#include <botan/exceptn.h>
-#include <botan/pk_keys.h>
-#include <botan/pkcs8.h>
-#include <botan/x509_key.h>
-#include <botan/pipe.h>
-#include <botan/filters.h>
-#include <botan/pubkey.h>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-
-
 void hybridKyberEncryptFile(const std::string& inputFilename, const std::string& encryptedDataOutputFilename, const std::string& encryptedKeyOutputFilename, const std::string& privateKeyOutputFilename) {
+    
+    auto start = std::chrono::high_resolution_clock::now();
+
     Botan::AutoSeeded_RNG rng;
 
     // Generate Kyber private key
@@ -56,11 +41,6 @@ void hybridKyberEncryptFile(const std::string& inputFilename, const std::string&
     // Encrypt the shared secret
     auto kem_result = enc.encrypt(rng, 32, {}); // 32 bytes = 256 bits, assuming no salt for simplicity
 
-    // Save encapsulated key
-    std::ofstream encryptedKeyFile(encryptedKeyOutputFilename, std::ios::out | std::ios::binary);
-    encryptedKeyFile.write(reinterpret_cast<const char*>(kem_result.encapsulated_shared_key().data()), kem_result.encapsulated_shared_key().size());
-    encryptedKeyFile.close();
-
     // Encrypt data using AES-256/CBC
     Botan::SymmetricKey aesKey(kem_result.shared_key());
     Botan::InitializationVector iv(rng, 16); // 16 bytes = 128 bits IV
@@ -74,6 +54,20 @@ void hybridKyberEncryptFile(const std::string& inputFilename, const std::string&
 
     enc_aes->finish(buffer);
 
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto inputFileSize = fs::file_size(inputFilename);
+    auto outputFileSize = fs::file_size(encryptedDataOutputFilename);
+
+    std::chrono::duration<double, std::milli> encryptionTime = end - start;
+    std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds." << std::endl;
+    std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
+
+    // Save encapsulated key
+    std::ofstream encryptedKeyFile(encryptedKeyOutputFilename, std::ios::out | std::ios::binary);
+    encryptedKeyFile.write(reinterpret_cast<const char*>(kem_result.encapsulated_shared_key().data()), kem_result.encapsulated_shared_key().size());
+    encryptedKeyFile.close();
+
     // Write encrypted data with IV prepended
     std::ofstream outFile(encryptedDataOutputFilename, std::ios::binary);
     outFile.write(reinterpret_cast<const char*>(iv.begin()), iv.size());
@@ -83,10 +77,10 @@ void hybridKyberEncryptFile(const std::string& inputFilename, const std::string&
 
 
 void hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, const std::string& encryptedKeyInputFilename, const std::string& decryptedOutputFilename, const std::string& privateKeyInputFilename) {
-    Botan::AutoSeeded_RNG rng;
-    std::array<uint8_t, 16> salt;
-    rng.randomize(salt);
+    
+    auto start = std::chrono::high_resolution_clock::now();
 
+    Botan::AutoSeeded_RNG rng;
 
     // Load the private key
     Botan::DataSource_Stream in(privateKeyInputFilename);
@@ -112,8 +106,6 @@ void hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, const
     std::vector<uint8_t> encrypted_data(std::istreambuf_iterator<char>(encryptedDataFile), {});
     encryptedDataFile.close();
 
-    std::cout << decrypted_shared_secret.data() << std::endl;
-
     // Decrypt the data using AES-256/CBC with the shared secret as the key
     Botan::SymmetricKey aesKey(decrypted_shared_secret.data(), decrypted_shared_secret.size());
     Botan::InitializationVector iv(ivData.data(), ivData.size());
@@ -123,12 +115,16 @@ void hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, const
 
     dec->finish(encrypted_data);  // In-place decryption
 
+    auto end = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double, std::milli> encryptionTime = end - start;
+
     // Write the decrypted data
     std::ofstream decryptedDataFile(decryptedOutputFilename, std::ios::binary);
     decryptedDataFile.write(reinterpret_cast<const char*>(encrypted_data.data()), encrypted_data.size());
     decryptedDataFile.close();
 
-    std::cout << "File decrypted successfully: " << decryptedOutputFilename << std::endl;
+    std::cout << "File: " << encryptedDataInputFilename << " decrypted in " << encryptionTime.count() << " milliseconds." << std::endl;
 }
 
 
@@ -148,9 +144,10 @@ void encryptDirectoryHybridKyber(const std::string& inputDir, const std::string&
             std::string outputPrivateKeyFilename = outputDir + "/keys/private_key_" + entry.path().filename().string() + ".pem";
 
             hybridKyberEncryptFile(inputPath, outputDataFilename, outputKeyFilename, outputPrivateKeyFilename);
-            std::cout << "Encrypted: " << inputPath << " -> " << outputDataFilename << std::endl;
+            //std::cout << "Encrypted: " << inputPath << " -> " << outputDataFilename << std::endl;
         }
     }
+    std::cout << "Encryption process done. \n" << std::endl;
 }
 
 
@@ -167,8 +164,8 @@ void decryptDirectoryHybridKyber(const std::string& inputDir) {
             std::string privateKeyInputFilename = inputDir + "/keys/private_key_" + baseFilename + ".pem";
 
             hybridKyberDecryptFile(entry.path(), inputKeyFilename, decryptedFilename, privateKeyInputFilename);
-            std::cout << "Decrypted: " << entry.path() << " -> " << decryptedFilename << std::endl;
         }
     }
+    std::cout << "Decryption process done. \n" << std::endl;
 }
 
