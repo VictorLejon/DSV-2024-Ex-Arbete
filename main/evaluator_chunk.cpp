@@ -1,5 +1,6 @@
 #include "RSAUtils.h"
 #include "HybridRSAUtils.h"
+#include "HybridKyberUtils.h"
 #include <iostream>
 #include <string>
 #include <botan/rsa.h>
@@ -21,12 +22,13 @@ int main(int argc, char* argv[]) {
 
     try {
         if (algorithm == "RSA") {
-            encryptDirectoryRSA(inputDir, outputDir, keySize);
-            decryptDirectoryRSA(outputDir, keySize);
+            runTestRSA(inputDir, outputDir);
         }
         else if (algorithm == "RSA-AES") {
-            encryptDirectoryHybridRSA(inputDir, outputDir);
-            decryptDirectoryHybridRSA(outputDir);
+            runTestRSA_AES(inputDir, outputDir);
+        }
+        else if (algorithm == "KYBER-AES"){
+            runTestKYBER_AES(inputDir, outputDir);
         }
         else {
             std::cerr << "Unsupported algorithm. Currently supported: RSA, RSA-AES, Kyber-AES\n";

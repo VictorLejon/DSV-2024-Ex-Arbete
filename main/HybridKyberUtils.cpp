@@ -19,7 +19,7 @@
 namespace fs = std::filesystem;
 
 
-void hybridKyberEncryptFile(const std::string& inputFilename, const std::string& encryptedDataOutputFilename, const std::string& encryptedKeyOutputFilename, const std::string& privateKeyOutputFilename) {
+std::string hybridKyberEncryptFile(const std::string& inputFilename, const std::string& encryptedDataOutputFilename, const std::string& encryptedKeyOutputFilename, const std::string& privateKeyOutputFilename) {
     
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -57,13 +57,6 @@ void hybridKyberEncryptFile(const std::string& inputFilename, const std::string&
 
     auto end = std::chrono::high_resolution_clock::now();
 
-    auto inputFileSize = fs::file_size(inputFilename);
-    auto outputFileSize = fs::file_size(encryptedDataOutputFilename);
-
-    std::chrono::duration<double, std::milli> encryptionTime = end - start;
-    std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds." << std::endl;
-    std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
-
     // Save encapsulated key
     std::ofstream encryptedKeyFile(encryptedKeyOutputFilename, std::ios::out | std::ios::binary);
     encryptedKeyFile.write(reinterpret_cast<const char*>(kem_result.encapsulated_shared_key().data()), kem_result.encapsulated_shared_key().size());
@@ -74,10 +67,19 @@ void hybridKyberEncryptFile(const std::string& inputFilename, const std::string&
     outFile.write(reinterpret_cast<const char*>(iv.begin()), iv.size());
     outFile.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
     outFile.close();
+
+    auto inputFileSize = fs::file_size(inputFilename);
+    auto outputFileSize = fs::file_size(encryptedDataOutputFilename);
+
+    std::chrono::duration<double, std::milli> encryptionTime = end - start;
+    std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds." << std::endl;
+    std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
+    fs::path filePath(inputFilename);
+    return filePath.filename().string() + "," + std::to_string(encryptionTime.count());
 }
 
 
-void hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, const std::string& encryptedKeyInputFilename, const std::string& decryptedOutputFilename, const std::string& privateKeyInputFilename) {
+std::string hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, const std::string& encryptedKeyInputFilename, const std::string& decryptedOutputFilename, const std::string& privateKeyInputFilename) {
     
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -126,25 +128,24 @@ void hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, const
     decryptedDataFile.close();
 
     std::cout << "File: " << encryptedDataInputFilename << " decrypted in " << encryptionTime.count() << " milliseconds." << std::endl;
+    fs::path filePath(decryptedOutputFilename);
+    return filePath.filename().string() + "," + std::to_string(encryptionTime.count());
 }
 
 
 
-void runTest(const std::string& inputDir, const std::string& outputDir){
-    std::string csvPath = "./RES_KYBER_AES_" + inputDir + ".csv";
-    CSVLogger::initCSV(csvPath);
-
+void runTestKYBER_AES(const std::string& inputDir, const std::string& outputDir){
     encryptDirectoryHybridKyber(inputDir, outputDir);
     decryptDirectoryHybridKyber(outputDir);
 }
 
 
 void encryptDirectoryHybridKyber(const std::string& inputDir, const std::string& outputDir) {
-
-
-
     fs::create_directories(outputDir);
     fs::create_directories(outputDir + "/keys");
+
+    std::string csvPath = "RES_KYBER_AES_ENCRYPT.csv";
+    CSVLogger::initCSV(csvPath);
 
     for (const auto& entry : fs::directory_iterator(inputDir)) {
         if (entry.is_regular_file()) {
@@ -153,8 +154,8 @@ void encryptDirectoryHybridKyber(const std::string& inputDir, const std::string&
             std::string outputKeyFilename = outputDir + "/keys/shared_secret_" + entry.path().filename().string() + ".bin";
             std::string outputPrivateKeyFilename = outputDir + "/keys/private_key_" + entry.path().filename().string() + ".pem";
 
-            hybridKyberEncryptFile(inputPath, outputDataFilename, outputKeyFilename, outputPrivateKeyFilename);
-            //std::cout << "Encrypted: " << inputPath << " -> " << outputDataFilename << std::endl;
+            std::string data = hybridKyberEncryptFile(inputPath, outputDataFilename, outputKeyFilename, outputPrivateKeyFilename);
+            CSVLogger::logData(csvPath, data);
         }
     }
     std::cout << "Encryption process done. \n" << std::endl;
@@ -165,6 +166,9 @@ void decryptDirectoryHybridKyber(const std::string& inputDir) {
     std::string outputDir = inputDir + "/decrypted";
     fs::create_directories(outputDir);
 
+    std::string csvPath = "RES_KYBER_AES_DECRYPT.csv";
+    CSVLogger::initCSV(csvPath);
+
     for (const auto& entry : fs::directory_iterator(inputDir)) {
         if (entry.is_regular_file() && entry.path().filename().string().find("encrypted_") != std::string::npos) {
             std::string encryptedFilename = entry.path().filename().string();
@@ -172,8 +176,8 @@ void decryptDirectoryHybridKyber(const std::string& inputDir) {
             std::string decryptedFilename = outputDir + "/decrypted_" + baseFilename;
             std::string inputKeyFilename = inputDir + "/keys/shared_secret_" + baseFilename + ".bin";
             std::string privateKeyInputFilename = inputDir + "/keys/private_key_" + baseFilename + ".pem";
-
-            hybridKyberDecryptFile(entry.path(), inputKeyFilename, decryptedFilename, privateKeyInputFilename);
+            std::string data = hybridKyberDecryptFile(entry.path(), inputKeyFilename, decryptedFilename, privateKeyInputFilename);
+            CSVLogger::logData(csvPath, data);
         }
     }
     std::cout << "Decryption process done. \n" << std::endl;

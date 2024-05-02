@@ -1,4 +1,5 @@
 #include "HybridRSAUtils.h"
+#include "CSVLogger.h"
 #include <botan/auto_rng.h>
 #include <botan/rsa.h>
 #include <botan/pkcs8.h>
@@ -12,7 +13,7 @@
 
 namespace fs = std::filesystem;
 
-void hybridEncryptFile(const std::string& inputFilename, const std::string& encryptedDataOutputFilename, const std::string& encryptedKeyOutputFilename, const std::string& privateKeyOutputFilename) {
+std::string hybridEncryptFile(const std::string& inputFilename, const std::string& encryptedDataOutputFilename, const std::string& encryptedKeyOutputFilename, const std::string& privateKeyOutputFilename) {
     
     auto start = std::chrono::high_resolution_clock::now();
     Botan::AutoSeeded_RNG rng;
@@ -66,10 +67,12 @@ void hybridEncryptFile(const std::string& inputFilename, const std::string& encr
     privateKeyFile << Botan::PKCS8::PEM_encode(rsaPrivateKey);
     privateKeyFile.close();
     std::cout << "Private RSA key written to " << privateKeyOutputFilename << std::endl;
+    fs::path filePath(inputFilename);
+    return filePath.filename().string() + "," + std::to_string(encryptionTime.count());
 }
 
 
-void hybridDecryptFile(const std::string& encryptedDataInputFilename, const std::string& encryptedKeyInputFilename, const std::string& decryptedOutputFilename, const std::string& privateKeyFilename) {
+std::string hybridDecryptFile(const std::string& encryptedDataInputFilename, const std::string& encryptedKeyInputFilename, const std::string& decryptedOutputFilename, const std::string& privateKeyFilename) {
    
     auto start = std::chrono::high_resolution_clock::now();
     Botan::AutoSeeded_RNG rng;
@@ -116,6 +119,8 @@ void hybridDecryptFile(const std::string& encryptedDataInputFilename, const std:
 
     std::cout << "File: " << encryptedDataInputFilename << " decrypted in " << decryptionTime.count() << " milliseconds." << std::endl;
     std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
+    fs::path filePath(decryptedOutputFilename);
+    return filePath.filename().string() + "," + std::to_string(decryptionTime.count());
 }
 
 
@@ -123,13 +128,17 @@ void encryptDirectoryHybridRSA(const std::string& inputDir, const std::string& o
     fs::create_directories(outputDir);
     fs::create_directories(outputDir + "/keys");
 
+    std::string csvPath = "RES_RSA_AES_ENCRYPTION.csv";
+    CSVLogger::initCSV(csvPath);
+
     for (const auto& entry : fs::directory_iterator(inputDir)) {
         if (entry.is_regular_file()) {
             std::string inputPath = entry.path();
             std::string outputDataFilename = outputDir + "/encrypted_" + entry.path().filename().string();
             std::string outputAESKeyFilename = outputDir + "/keys/aes_encrypted_" + entry.path().filename().string() + ".key";
             std::string outputRSAKeyFilename = outputDir + "/keys/rsa_encrypted_" + entry.path().filename().string() + ".pem";
-            hybridEncryptFile(inputPath, outputDataFilename, outputAESKeyFilename, outputRSAKeyFilename);
+            std::string data = hybridEncryptFile(inputPath, outputDataFilename, outputAESKeyFilename, outputRSAKeyFilename);
+            CSVLogger::logData(csvPath, data);
         }
     }
     std::cout << "Encryption process done. \n" << std::endl;
@@ -138,6 +147,9 @@ void encryptDirectoryHybridRSA(const std::string& inputDir, const std::string& o
 
 void decryptDirectoryHybridRSA(const std::string& inputDir) {
     fs::create_directories(inputDir + "/decrypted");
+    std::cout << inputDir;
+    std::string csvPath = "RES_RSA_AES_DECRYPTION.csv";
+    CSVLogger::initCSV(csvPath);
 
     for (const auto& entry : fs::directory_iterator(inputDir)) {
         if (entry.is_regular_file()) {
@@ -145,17 +157,15 @@ void decryptDirectoryHybridRSA(const std::string& inputDir) {
             std::string inputKeyPath = inputDir + "/keys/aes_" + entry.path().filename().string() + ".key";
             std::string outputFilename = inputDir + "/decrypted/" + "decrypted_" + entry.path().filename().string();
             std::string privKeyPath = inputDir + "/keys/rsa_" + entry.path().filename().string() + ".pem";
-            hybridDecryptFile(inputPath, inputKeyPath, outputFilename, privKeyPath);
+            std::string data = hybridDecryptFile(inputPath, inputKeyPath, outputFilename, privKeyPath);
+            CSVLogger::logData(csvPath, data);
         }
     }
     std::cout << "Decryption process done. \n" << std::endl;
 }
 
 
-void runTest(const std::string& inputDir, const std::string& outputDir){
-    std::string csvPath = "./RES_RSA_AES_" + inputDir + ".csv";
-    CSVLogger::initCSV(csvPath);
-
+void runTestRSA_AES(const std::string& inputDir, const std::string& outputDir){
     encryptDirectoryHybridRSA(inputDir, outputDir);
     decryptDirectoryHybridRSA(outputDir);
 }

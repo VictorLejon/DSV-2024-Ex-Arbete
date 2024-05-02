@@ -1,5 +1,6 @@
 // RSAUtils.cpp
 #include "RSAUtils.h"
+#include "CSVLogger.h"
 #include <botan/pkcs8.h>
 #include <botan/data_src.h>
 #include <botan/auto_rng.h>
@@ -57,7 +58,7 @@ void encryptChunkRSA(const Botan::PK_Encryptor_EME& encryptor, std::vector<uint8
     chunkCount++; // Increment the chunk counter
 }
 
-void encryptFileRSA(const std::string& inputFilename, const std::string& outputDir, const std::string& outputFilename,  size_t keySize) {
+std::string encryptFileRSA(const std::string& inputFilename, const std::string& outputDir, const std::string& outputFilename,  size_t keySize) {
 
     size_t maxChunkSize = keySize == 1024 ? 62 : 190; // Adjust based on key size and padding scheme
     unsigned long long chunkCount = 0; // Initialize chunk counte
@@ -96,6 +97,8 @@ void encryptFileRSA(const std::string& inputFilename, const std::string& outputD
     std::cout << "File: " << inputFilename << " encrypted in " << encryptionTime.count() << " milliseconds with " << chunkCount << " chunks." << std::endl;
     std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
     writePrivateKeyToFile(privateKey, outputDir + "/keys/" + outputFilename + ".pem"); // Done for decryption purposes, not secure
+    fs::path filePath(inputFilename);
+    return filePath.filename().string() + "," + std::to_string(encryptionTime.count());
 }
 
 void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputDir, size_t keySize) {
@@ -103,11 +106,15 @@ void encryptDirectoryRSA(const std::string& inputDir, const std::string& outputD
     fs::create_directories(outputDir);
     fs::create_directories(outputDir + "/keys");
 
+    std::string csvPath = "RES_RSA_ENCRYPTION.csv";
+    CSVLogger::initCSV(csvPath);
+
     for (const auto& entry : fs::directory_iterator(inputDir)) {
         if (entry.is_regular_file()) {
             std::string inputPath = entry.path();
             std::string outputFilename = "encrypted_" + entry.path().filename().string();
-            encryptFileRSA(inputPath, outputDir, outputFilename, keySize);
+            std::string data = encryptFileRSA(inputPath, outputDir, outputFilename, keySize);
+            CSVLogger::logData(csvPath, data);
         }
     }
 
@@ -122,7 +129,7 @@ void decryptChunkRSA(const Botan::PK_Decryptor_EME& decryptor, std::vector<uint8
 }
 
 
-void decryptFileRSA(const std::string& inputFilename, const std::string& outputFilename, const Botan::RSA_PrivateKey& privateKey, size_t keySize) {
+std::string decryptFileRSA(const std::string& inputFilename, const std::string& outputFilename, const Botan::RSA_PrivateKey& privateKey, size_t keySize) {
 
     size_t encryptedChunkSize = keySize == 1024 ? 128 : 256;
     
@@ -154,11 +161,16 @@ void decryptFileRSA(const std::string& inputFilename, const std::string& outputF
     auto outputFileSize = fs::file_size(outputFilename);
 
     std::cout << "File: " << inputFilename << " decrypted in " << decryptionTime.count() << " milliseconds." << std::endl;
-    std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
+    //std::cout << "Input file size: " << inputFileSize << " bytes, Output file size: " << outputFileSize << " bytes." << std::endl;
+    fs::path filePath(outputFilename);
+    return filePath.filename().string() + "," + std::to_string(decryptionTime.count());
 }
 
 void decryptDirectoryRSA(const std::string& outputDir, size_t keySize) {
     fs::create_directories(outputDir + "/decrypted");
+
+    std::string csvPath = "RES_RSA_DECRYPTION.csv";
+    CSVLogger::initCSV(csvPath);
 
     for (const auto& entry : fs::directory_iterator(outputDir)) {
         if (entry.is_regular_file()) {
@@ -166,17 +178,15 @@ void decryptDirectoryRSA(const std::string& outputDir, size_t keySize) {
             std::string outputPath = outputDir + "/decrypted" + "/decrypted_" + entry.path().filename().string();
             Botan::AutoSeeded_RNG rng;
             auto privateKey = loadPrivateKeyFromFile(outputDir + "/keys/" + entry.path().filename().string() + ".pem", rng);
-            decryptFileRSA(inputPath, outputPath, privateKey, keySize);
+            std::string data = decryptFileRSA(inputPath, outputPath, privateKey, keySize);
+            CSVLogger::logData(csvPath, data);
         }
     }
     std::cout << "Decryption process done. \n" << std::endl;
 }
 
 
-void runTest(const std::string& inputDir, const std::string& outputDir){
-    std::string csvPath = "./RES_KYBER_AES_" + inputDir + ".csv";
-    CSVLogger::initCSV(csvPath);
-
-    encryptDirectoryRSA(inputDir, outputDir);
-    decryptDirectoryRSA(outputDir);
+void runTestRSA(const std::string& inputDir, const std::string& outputDir){
+    encryptDirectoryRSA(inputDir, outputDir, 2048);
+    decryptDirectoryRSA(outputDir, 2048);
 }

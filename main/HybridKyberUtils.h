@@ -3,12 +3,12 @@
 
 #include <string>
 
-    void hybridKyberEncryptFile(const std::string& inputFilename, 
+    std::string hybridKyberEncryptFile(const std::string& inputFilename, 
                                 const std::string& encryptedDataOutputFilename, 
                                 const std::string& encryptedKeyOutputFilename, 
                                 const std::string& publicKeyOutputFilename);
 
-    void hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, 
+    std::string hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, 
                                 const std::string& encryptedKeyInputFilename, 
                                 const std::string& decryptedOutputFilename, 
                                 const std::string& privateKeyInputFilename);
@@ -18,6 +18,6 @@
 
     void decryptDirectoryHybridKyber(const std::string& inputDir);
 
-    void runTest(const std::string& inputDir, const std::string& outputDir);
+    void runTestKYBER_AES(const std::string& inputDir, const std::string& outputDir);
 
 #endif // HYBRID_KYBER_UTILS_H
