@@ -150,3 +150,12 @@ void decryptDirectoryHybridRSA(const std::string& inputDir) {
     }
     std::cout << "Decryption process done. \n" << std::endl;
 }
+
+
+void runTest(const std::string& inputDir, const std::string& outputDir){
+    std::string csvPath = "./RES_RSA_AES_" + inputDir + ".csv";
+    CSVLogger::initCSV(csvPath);
+
+    encryptDirectoryHybridRSA(inputDir, outputDir);
+    decryptDirectoryHybridRSA(outputDir);
+}

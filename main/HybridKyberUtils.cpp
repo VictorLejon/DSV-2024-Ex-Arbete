@@ -1,4 +1,5 @@
 #include "HybridKyberUtils.h"
+#include "CSVLogger.h"
 #include <botan/auto_rng.h>
 #include <botan/kyber.h>
 #include <botan/block_cipher.h>
@@ -129,10 +130,19 @@ void hybridKyberDecryptFile(const std::string& encryptedDataInputFilename, const
 
 
 
+void runTest(const std::string& inputDir, const std::string& outputDir){
+    std::string csvPath = "./RES_KYBER_AES_" + inputDir + ".csv";
+    CSVLogger::initCSV(csvPath);
 
+    encryptDirectoryHybridKyber(inputDir, outputDir);
+    decryptDirectoryHybridKyber(outputDir);
+}
 
 
 void encryptDirectoryHybridKyber(const std::string& inputDir, const std::string& outputDir) {
+
+
+
     fs::create_directories(outputDir);
     fs::create_directories(outputDir + "/keys");
 

@@ -18,4 +18,6 @@
 
     void decryptDirectoryHybridKyber(const std::string& inputDir);
 
+    void runTest(const std::string& inputDir, const std::string& outputDir);
+
 #endif // HYBRID_KYBER_UTILS_H

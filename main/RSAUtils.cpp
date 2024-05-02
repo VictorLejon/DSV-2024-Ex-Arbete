@@ -171,3 +171,12 @@ void decryptDirectoryRSA(const std::string& outputDir, size_t keySize) {
     }
     std::cout << "Decryption process done. \n" << std::endl;
 }
+
+
+void runTest(const std::string& inputDir, const std::string& outputDir){
+    std::string csvPath = "./RES_KYBER_AES_" + inputDir + ".csv";
+    CSVLogger::initCSV(csvPath);
+
+    encryptDirectoryRSA(inputDir, outputDir);
+    decryptDirectoryRSA(outputDir);
+}
